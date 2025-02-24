@@ -49,12 +49,15 @@ void loop() {
 
   if (ch8Value == 1){
     RX_OverRide(ch1Value, ch2Value);
-    if (PI_SERIAL.available()){
-      String data = PI_SERIAL.readStringUntil('\n');
-      int cx = 0;
-      sscanf(data.c_str(), "%d", &cx);
-      findPosistionfromCenter(cx);
-    }
+  }
+  else if (PI_SERIAL.available() && ch8Value != 1){
+    String data = PI_SERIAL.readStringUntil('\n');
+    int cx = 0;
+    sscanf(data.c_str(), "%d", &cx);
+    findPosistionfromCenter(cx);
+  }
+  else{
+    terminateInactive()
   }
 }
 
@@ -72,4 +75,9 @@ void findPosistionfromCenter(int cx) {
     roboclaw.ForwardM1(ROBOCLAW_ADDRESS, 0);
     roboclaw.ForwardM2(ROBOCLAW_ADDRESS, 0);
   }
+}
+
+void terminateInactive(){
+  roboclaw.ForwardM1(ROBOCLAW_ADDRESS, 0);
+  roboclaw.ForwardM2(ROBOCLAW_ADDRESS, 0);
 }
