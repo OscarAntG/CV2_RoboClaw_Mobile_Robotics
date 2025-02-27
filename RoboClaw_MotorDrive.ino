@@ -1,17 +1,16 @@
+// THIS ENTIRE CODE NEEDS TO BE TESTED FOR LOGIC CONTROL AND SAFTEY IMPLEMENTATIONS
+// This is using the Arduino Mega for its multiple Serial ports
+// This is vital for the functionalilty of this autonomous system
+// Author John Marcial and Oscar Gonzalez
 #include <RoboClaw.h>
-#include <SoftwareSerial.h>
 
-// Channles to record from the TX hand remote
+// Channles to record from the TX hand remote (Use PMW Pins)
 #define CH1 6
 #define CH2 5
 #define CH8 3
 
- // Change to match your Arduino's hardware serial port for RoboClaw
-#define ROBOCLAW_ADDRESS 0x80 // Default address
-
 // Initialize RoboClaw object
-SoftwareSerial serial(10, 11);
-RoboClaw roboclaw(&serial, 10000);
+RoboClaw roboclaw(&Serial1, 10000);
 
 // Read the number of a given channel and convert to the range provided.
 // If the channel is off, return the default value
@@ -31,6 +30,8 @@ bool redSwitch(byte channelInput, bool defaultValue){
 void setup() {
   // put your setup code here, to run once:
   // Initialize RoboClaw
+  Serial.begin(115200);
+  Serial1.begin(38400); 
   roboclaw.begin(38400);
   pinMode(CH1, INPUT);
   pinMode(CH2, INPUT);
@@ -50,34 +51,49 @@ void loop() {
   if (ch8Value == 1){
     RX_OverRide(ch1Value, ch2Value);
   }
-  else if (PI_SERIAL.available() && ch8Value != 1){
-    String data = PI_SERIAL.readStringUntil('\n');
+  else if (Serial.available() && ch8Value != 1){
+    String data = Serial.readStringUntil('\n');
     int cx = 0;
     sscanf(data.c_str(), "%d", &cx);
     findPosistionfromCenter(cx);
   }
   else{
-    terminateInactive()
+    terminateInactive();
   }
 }
 
+// NEEDS TESTING 
+// We can add backwards and forwards driving if we get this right
 void RX_OverRide(int channel1, int channel2){
-  roboclaw.ForwardM1(ROBOCLAW_ADDRESS, constrain(channel1, 0, 127));
-  roboclaw.ForwardM2(ROBOCLAW_ADDRESS, constrain(channel2, 0, 127));
+  if ((channel1 > 0) && (channel2 > 0)){
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(128);  // 128	Channel 2 full forward
+  } else if ((channel1 > 0) && (channel2 !> 0)){
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(192);  // 192	Channel 2 stop
+  } else if ((channel2 > 0) && (channel1 !> 0)){
+    Serial1.write(128);  // 128	Channel 2 full forward
+    Serial1.write(64);  // 64	Channel 1 stop
+  } else{
+    ternminateInactive();
+  }
 }
 
 void findPosistionfromCenter(int cx) {
-  if (cx >= 0) {
-    roboclaw.ForwardM1(ROBOCLAW_ADDRESS, constrain(cx, 0, 127));
-  } else if (cx < 0) {
-    roboclaw.ForwardM2(ROBOCLAW_ADDRESS, constrain(cx, 0, 127));
-  } else {
-    roboclaw.ForwardM1(ROBOCLAW_ADDRESS, 0);
-    roboclaw.ForwardM2(ROBOCLAW_ADDRESS, 0);
+  if (cx > 48) {
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(192);  // 192	Channel 2 stop
+  } else if (cx < -48) {
+    Serial1.write(128);  // 128	Channel 2 full forward
+    Serial1.write(64);  // 64	Channel 1 stop
+  } else if ( cx != 0 && cx >= -48 && cx <= 48){
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(128);  // 128	Channel 2 full forward
+  } else{
+    terminateInactive();
   }
 }
 
 void terminateInactive(){
-  roboclaw.ForwardM1(ROBOCLAW_ADDRESS, 0);
-  roboclaw.ForwardM2(ROBOCLAW_ADDRESS, 0);
+  Serial1.write(0); // 0	Shuts down channels 1 and 2
 }
