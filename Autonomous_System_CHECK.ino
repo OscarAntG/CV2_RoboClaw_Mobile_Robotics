@@ -1,20 +1,20 @@
+// This is using the Arduino Mega for its multiple Serial ports
+// This is vital for the functionalilty of this autonomous system
+// Author John Marcial and Oscar Gonzalez
 #include <RoboClaw.h>
-#include <SoftwareSerial.h>
-// Define RoboClaw address
-#define ROBOCLAW_ADDRESS 0x80  // Default address
 
 // Initialize RoboClaw object
-SoftwareSerial ROBOSERIAL(10, 11);
-RoboClaw roboclaw(&ROBOSERIAL, 10000);
+RoboClaw roboclaw(&Serial1, 10000);
 
 void setup() {
     // Start communication
-    Serial.begin(115200);  // Communication with Raspberry Pi
+    Serial.begin(115200);  // Communication with computer
+    Serial1.begin(38400);  
     roboclaw.begin(38400); // Initialize RoboClaw
 }
 
 void loop() {
-    // Check if data is available from Raspberry Pi
+    // Check if data is available from computer
     if (Serial.available()){
       String data = Serial.readStringUntil('\n');
       int cx = 0;
@@ -24,12 +24,20 @@ void loop() {
 }
 
 void findPosistionfromCenter(int cx) {
-  if (cx >= 0) {
-    roboclaw.ForwardM1(ROBOCLAW_ADDRESS, constrain(cx, 0, 127));
-  } else if (cx < 0) {
-    roboclaw.ForwardM2(ROBOCLAW_ADDRESS, constrain(abs(cx), 0, 127));
-  } else {
-    roboclaw.ForwardM1(ROBOCLAW_ADDRESS, 0);
-    roboclaw.ForwardM2(ROBOCLAW_ADDRESS, 0);
+  if (cx > 48) {
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(192);  // 192	Channel 2 stop
+  } else if (cx < -48) {
+    Serial1.write(128);  // 128	Channel 2 full forward
+    Serial1.write(64);  // 64	Channel 1 stop
+  } else if ( cx != 0 && cx >= -48 && cx <= 48){
+    Serial1.write(127);  // 127	Channel 1 full forward
+    Serial1.write(128);  // 128	Channel 2 full forward
+  } else{
+    terminateInactive();
   }
+}
+
+void terminateInactive(){
+  Serial1.write(0); // 0	Shuts down channels 1 and 2
 }
