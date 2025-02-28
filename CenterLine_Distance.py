@@ -3,8 +3,10 @@ import serial.tools.list_ports
 import numpy as np
 import cv2
 
-# Setup of the COM port communcation
+# Setup of the COM port communcation (Windows Only)
 ports = serial.tools.list_ports.grep('COM')
+# Setup of the COM port communcation (Linux Only)
+#ports = serial.tools.list_ports.grep('tty')
 serialInst = serial.Serial()
 
 # Way to list all ports available
@@ -15,11 +17,14 @@ for onePort in ports:
     print(str(onePort))
 
 # Choose the port you want to connect to
-val = input('Select Port: COM')
+val = input('Select Port: COM')  # (Windows Only)
+# val - input('Select Port: /dev/ttyACM')  # (Linux Only)
 
 for x in range(0, len(portsList)):
-    if portsList[x].startswith('COM' + str(val)):
+    if portsList[x].startswith('COM' + str(val)):  # Windows
+    #if portsList[x].startswith('/dev/ttyACM' + str(val)):  # Linux
         portVar = 'COM' + str(val)
+        #portVar = '/dev/ttyACM' + str(val)
         print(portVar)
 
 # Change the baudrate and then it opens the channel
@@ -60,7 +65,6 @@ cap = cv2.VideoCapture(0)
 # Use this to get the max width frames to know when to move left and right and by how much.
 default_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 # print("Default frame width:", default_width)  #CALIBRATION PURPOSES ONLY
-
 
 # Accesses camera and finds the targeted color and displays it
 while True:
