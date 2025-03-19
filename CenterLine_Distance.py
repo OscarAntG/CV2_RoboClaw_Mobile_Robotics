@@ -1,13 +1,13 @@
 # Importing Libraries
+from errorCorrection import ErrorByte
 import serial.tools.list_ports
 import numpy as np
 import cv2
 
-# Setup of the COM port communcation (Windows Only)
+# Setup of the COM port communication
 ports = serial.tools.list_ports.grep('COM')
-# Setup of the COM port communcation (Linux Only)
-#ports = serial.tools.list_ports.grep('tty')
 serialInst = serial.Serial()
+byte_correction = ErrorByte()
 
 # Way to list all ports available
 portsList = []
@@ -17,17 +17,14 @@ for onePort in ports:
     print(str(onePort))
 
 # Choose the port you want to connect to
-val = input('Select Port: COM')  # (Windows Only)
-# val - input('Select Port: /dev/ttyACM')  # (Linux Only)
+val = input('Select Port: COM')
 
 for x in range(0, len(portsList)):
-    if portsList[x].startswith('COM' + str(val)):  # Windows
-    #if portsList[x].startswith('/dev/ttyACM' + str(val)):  # Linux
+    if portsList[x].startswith('COM' + str(val)):
         portVar = 'COM' + str(val)
-        #portVar = '/dev/ttyACM' + str(val)
         print(portVar)
 
-# Change the baudrate and then it opens the channel
+# Change the baudrate, and then it opens the channel
 serialInst.baudrate = 115200
 serialInst.port = portVar
 serialInst.open()
@@ -41,7 +38,7 @@ Red_LowerLimit = np.array([0, 150, 150], dtype=np.uint8)
 Red_upperLimit = np.array([10, 255, 255], dtype=np.uint8)
 
 # Green color detection limits
-green_lower = np.array([50, 50, 50], dtype=np.uint8)
+green_lower = np.array([50, 100, 100], dtype=np.uint8)
 green_upper = np.array([90, 255, 255], dtype=np.uint8)
 
 # Yellow color detection limits
@@ -57,7 +54,7 @@ lower_color = [Dark_red_LowerLimit, Red_LowerLimit, green_lower, yellow_lower, b
 higher_color = [Dark_red_UpperLimit, Red_upperLimit, green_upper, yellow_higher, blue_higher]
 
 # filter resolution
-kernel = np.ones((25, 25), np.uint8)
+kernel = np.ones((5, 5), np.uint8)
 
 # Initializing Video Capture #
 cap = cv2.VideoCapture(0)
@@ -65,6 +62,7 @@ cap = cv2.VideoCapture(0)
 # Use this to get the max width frames to know when to move left and right and by how much.
 default_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 # print("Default frame width:", default_width)  #CALIBRATION PURPOSES ONLY
+
 
 # Accesses camera and finds the targeted color and displays it
 while True:
@@ -81,28 +79,30 @@ while True:
     results = cv2.drawContours(results, mask_contours, -1, (0, 0, 255), 3)
 
     # The natural state of command should be 0 in case there is no color detected
-    command = f'0\n'
+    distance_center = 0
+    error = 0
+    command = f'{distance_center},{error}\n'
+    # command = f'{distance_center}\n'
 
     # crates a box around the targeted color
     if len(mask_contours) != 0:
         for mask_contours in mask_contours:
-            if cv2.contourArea(mask_contours) > 500:
-                # This finds the center of the color
-                M = cv2.moments(mask_contours)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                cv2.circle(results, (cX, cY), 7, (0, 0, 0), -1)
-                # Find the center and the distance from the center
-                movement_variable = cX - (default_width/2)
-                # Sends the distance from the center as a command to the arduino
-                command = f'{movement_variable}\n'
-                print(f'Move by: {movement_variable}')  #DEGUGGING PURPOSES ONLY
-
-
-                # On the arduino end make it receive these number fi it's a negative take the absolute and move only the
-                # left motors if positive just move the right motors
+            M = cv2.moments(mask_contours)
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            if cY > 336:
+                if cv2.contourArea(mask_contours) > 500:
+                    cv2.circle(results, (cX, cY), 7, (0, 0, 0), -1)
+                    distance_center = cX - (default_width / 2)
+                    command = f'{distance_center},0\n'
+                    if abs(distance_center) > 106:
+                        proportional = ((default_width / 2) * .665625)
+                        uncorrectedError = (cX - proportional) / proportional
+                        error = byte_correction.serial_byte_correction(uncorrectedError)
+                        command = f'{distance_center},{error}\n'
 
     # Send the command
+    print(f'{distance_center},{error}')
     serialInst.write(command.encode('utf-8'))
 
 # This shows the photo with the box, the mask, and what the computer will see before putting a box this is for debugging
@@ -110,7 +110,7 @@ while True:
 #     cv2.imshow('Frame', frame)
 #     cv2.imshow('HSV', hsv)
 #     cv2.imshow('Mask', mask)
-    cv2.imshow('Results', results)  #You need this to close actually
+    cv2.imshow('Results', results)  # You need this to close actually
 
 # Waits for the user to hit the q button to close program #
     if cv2.waitKey(1) == ord('q'):
